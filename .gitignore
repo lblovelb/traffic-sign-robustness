@@ -1,0 +1,26 @@
+# data and experiment outputs (large / regenerable)
+data/
+mlruns/
+mlflow.db
+mlartifacts/
+results/quick/
+results/*.csv
+
+# keep results/summary.md and results/robustness.png so the README can show them
+
+# python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# secrets and local settings
+.env
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.obsidian/

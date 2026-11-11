@@ -1,0 +1,44 @@
+# Full experiment. Change values here, never hard-code them in src/.
+image_size: 32
+data_dir: data
+results_dir: results
+seeds: [0, 1, 2]
+
+# Which (model, training data) pairs to compare.
+runs:
+  - {model: hog_svm, train: clean}
+  - {model: cnn, train: clean}
+  - {model: cnn, train: augmented}
+
+cnn:
+  epochs: 10
+  batch_size: 128
+
+hog_svm:
+  C: 1.0
+
+# Mitigation: corrupt part of the training set. Only SOME corruptions are used
+# so we can measure whether robustness transfers to corruptions never seen
+# in training (blur and rain here).
+augmentation:
+  corruptions: [gaussian_noise, darkness, fog]
+  max_severity: 3
+  prob: 0.5
+
+evaluation:
+  corruptions: [gaussian_noise, darkness, fog, blur, rain]
+  severities: [1, 2, 3, 4, 5]
+  # Corrupted test sets depend only on this seed, so every model is tested
+  # on exactly the same images.
+  corruption_seed: 1234
+
+mlflow:
+  experiment_name: traffic-sign-robustness
+
+# Overrides used with --quick: a smoke test that finishes in a few minutes.
+quick:
+  seeds: [0]
+  train_samples: 4000
+  test_samples: 2000
+  cnn_epochs: 2
+  severities: [1, 3, 5]

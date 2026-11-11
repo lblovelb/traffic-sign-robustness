@@ -1,0 +1,10 @@
+# Lightweight set for CI: tests don't need TensorFlow or MLflow.
+numpy
+pandas
+scikit-learn
+pillow
+pyyaml
+matplotlib
+tabulate
+pytest
+ruff
