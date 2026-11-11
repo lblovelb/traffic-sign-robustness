@@ -155,6 +155,12 @@ def run(cfg: dict) -> Path:
                         )
 
                     model = make_model(model_name, cfg, seed, x_fit.shape[1:]).fit(x_fit, y_train)
+                    
+                    # Log Keras training history per epoch so MLflow can plot learning curves.
+                    # HOG+SVM has no epochs, so it has no history and logs nothing here.
+                    for metric_name, values in getattr(model, "history", {}).items():
+                        for epoch, value in enumerate(values, start=1):
+                            mlflow.log_metric(f"epoch_{metric_name}", value, step=epoch)
                     latency = metrics.latency_ms_per_image(model.predict, x_test)
                     size = model.size_mb()
                     mlflow.log_metrics({"latency_ms": latency, "size_mb": size})

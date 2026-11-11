@@ -56,9 +56,9 @@ class CNNClassifier:
         self.batch_size = batch_size
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> CNNClassifier:
-        self.model.fit(
+        self.history = self.model.fit(
             x, y, epochs=self.epochs, batch_size=self.batch_size, validation_split=0.1, verbose=2
-        )
+        ).history
         return self
 
     def predict(self, x: np.ndarray) -> np.ndarray:
