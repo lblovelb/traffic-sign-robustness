@@ -102,6 +102,11 @@ def run(cfg: dict) -> Path:
         x_train, y_train = data.stratified_subsample(x_train, y_train, cfg["train_samples"], 0)
         x_test, y_test = data.stratified_subsample(x_test, y_test, cfg["test_samples"], 0)
     x_train, x_test = data.to_float(x_train), data.to_float(x_test)
+    # GTSRB is stored sorted by class, and Keras' validation_split takes the
+    # LAST 10% of the data. Without shuffling, the last classes end up only in
+    # validation and are never trained on. Shuffle once with a fixed seed.
+    order = np.random.default_rng(0).permutation(len(y_train))
+    x_train, y_train = x_train[order], y_train[order]
 
     aug = cfg["augmentation"]
     ev = cfg["evaluation"]
