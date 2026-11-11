@@ -155,7 +155,7 @@ def run(cfg: dict) -> Path:
                         )
 
                     model = make_model(model_name, cfg, seed, x_fit.shape[1:]).fit(x_fit, y_train)
-                    
+
                     # Log Keras training history per epoch so MLflow can plot learning curves.
                     # HOG+SVM has no epochs, so it has no history and logs nothing here.
                     for metric_name, values in getattr(model, "history", {}).items():
