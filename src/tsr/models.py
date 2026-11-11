@@ -21,11 +21,11 @@ def build_cnn(num_classes: int, input_shape: tuple[int, int, int], seed: int):
         [
             tf.keras.Input(shape=input_shape),
             tf.keras.layers.Conv2D(32, 3, padding="same", activation="relu"),
-            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.BatchNormalization(momentum=0.9),
             tf.keras.layers.Conv2D(32, 3, padding="same", activation="relu"),
             tf.keras.layers.MaxPooling2D(),
             tf.keras.layers.Conv2D(64, 3, padding="same", activation="relu"),
-            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.BatchNormalization(momentum=0.9),
             tf.keras.layers.Conv2D(64, 3, padding="same", activation="relu"),
             tf.keras.layers.MaxPooling2D(),
             tf.keras.layers.Flatten(),
