@@ -14,6 +14,7 @@ from pathlib import Path
 
 import matplotlib
 
+# "Agg" draws straight to image files without opening a window.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -35,6 +36,7 @@ def corruption_grid(images: np.ndarray, labels: np.ndarray, out: Path, severity:
     names = ["clean", *CORRUPTIONS]
     fig, axes = plt.subplots(len(names), len(images), figsize=(1.3 * len(images), 1.4 * len(names)))
     for row, name in enumerate(names):
+        # seed=0 so the example images look the same every time the script runs.
         imgs = images if name == "clean" else corruptions.apply(images, name, severity, seed=0)
         for col in range(len(images)):
             _show(axes[row, col], imgs[col], f"class {labels[col]}" if row == 0 else None)

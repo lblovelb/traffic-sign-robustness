@@ -68,6 +68,7 @@ def plot_curves(histories: Histories, out: Path) -> None:
             if not runs:
                 continue
             n = min(len(r) for r in runs)  # in case runs have different lengths
+            # Rows = seeds, columns = epochs; average down the columns.
             values = np.array([r[:n] for r in runs])
             mean, std = values.mean(axis=0), values.std(axis=0)
             epochs = np.arange(1, n + 1)

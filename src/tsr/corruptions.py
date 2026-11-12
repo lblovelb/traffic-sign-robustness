@@ -14,10 +14,12 @@ from collections.abc import Callable
 
 import numpy as np
 
+# Every corruption has five levels, from barely visible (1) to severe (5).
 SEVERITIES = (1, 2, 3, 4, 5)
 
 
 def _check(images: np.ndarray, severity: int) -> None:
+    """Fail early with a clear message instead of a confusing NumPy error later."""
     if images.ndim != 4 or images.shape[-1] != 3:
         raise ValueError(f"expected (N, H, W, 3) images, got shape {images.shape}")
     if severity not in SEVERITIES:
@@ -25,6 +27,7 @@ def _check(images: np.ndarray, severity: int) -> None:
 
 
 def _gaussian_kernel(sigma: float) -> np.ndarray:
+    """1-D bell-curve weights; a larger sigma averages over more neighbours (more blur)."""
     radius = max(1, int(round(3 * sigma)))
     x = np.arange(-radius, radius + 1, dtype=np.float32)
     k = np.exp(-(x**2) / (2 * sigma**2))
@@ -32,7 +35,13 @@ def _gaussian_kernel(sigma: float) -> np.ndarray:
 
 
 def _separable_blur(images: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-    """Blur along H and W with a 1-D kernel, reflect padding, batched."""
+    """Blur along H and W with a 1-D kernel, reflect padding, batched.
+
+    Blurring rows and then columns with a 1-D kernel gives the same result as one
+    2-D Gaussian blur, but is much cheaper. Each output pixel becomes a weighted
+    average of its neighbours. "reflect" padding mirrors the image at its edges so
+    border pixels also have neighbours.
+    """
     r = len(kernel) // 2
     out = images
     for axis in (1, 2):
@@ -50,6 +59,8 @@ def _separable_blur(images: np.ndarray, kernel: np.ndarray) -> np.ndarray:
 def gaussian_noise(images: np.ndarray, severity: int, rng: np.random.Generator) -> np.ndarray:
     """Sensor noise, e.g. a camera in low light."""
     _check(images, severity)
+    # Standard deviation of the noise per severity. Pixel values range 0-1, so 0.26
+    # means a typical pixel is pushed about a quarter of the full range up or down.
     std = (0.04, 0.08, 0.12, 0.18, 0.26)[severity - 1]
     noisy = images + rng.normal(0.0, std, size=images.shape).astype(np.float32)
     return np.clip(noisy, 0.0, 1.0).astype(np.float32)
@@ -58,6 +69,7 @@ def gaussian_noise(images: np.ndarray, severity: int, rng: np.random.Generator) 
 def blur(images: np.ndarray, severity: int, rng: np.random.Generator) -> np.ndarray:
     """Defocus or motion-like blur (Gaussian)."""
     _check(images, severity)
+    # Blur radius in pixels; at 2.5 on a 32x32 image most detail is gone.
     sigma = (0.5, 0.9, 1.3, 1.8, 2.5)[severity - 1]
     return np.clip(_separable_blur(images, _gaussian_kernel(sigma)), 0.0, 1.0).astype(np.float32)
 
@@ -67,18 +79,23 @@ def darkness(images: np.ndarray, severity: int, rng: np.random.Generator) -> np.
     _check(images, severity)
     scale = (0.7, 0.5, 0.35, 0.25, 0.15)[severity - 1]
     gamma = (1.2, 1.4, 1.6, 1.8, 2.0)[severity - 1]
+    # Values are in [0, 1], so raising them to a power > 1 makes dark pixels darker
+    # much faster than bright ones (0.5**2 = 0.25 but 0.9**2 = 0.81). Then the whole
+    # image is scaled down.
     return np.clip(scale * images**gamma, 0.0, 1.0).astype(np.float32)
 
 
 def fog(images: np.ndarray, severity: int, rng: np.random.Generator) -> np.ndarray:
     """Fog: blend towards a bright, uneven haze layer and lose contrast."""
     _check(images, severity)
+    # How much of the final image is haze instead of the original sign.
     alpha = (0.25, 0.4, 0.55, 0.7, 0.82)[severity - 1]
     n, h, w, _ = images.shape
     # Low-frequency haze: a coarse random grid upsampled and smoothed.
     grid = rng.uniform(0.7, 0.95, size=(n, 4, 4, 1)).astype(np.float32)
     haze = np.repeat(np.repeat(grid, -(-h // 4), axis=1), -(-w // 4), axis=2)[:, :h, :w, :]
     haze = _separable_blur(np.repeat(haze, 3, axis=3), _gaussian_kernel(max(h, w) / 8))
+    # Linear blend: alpha=0.82 keeps only 18% of the original contrast.
     return np.clip((1 - alpha) * images + alpha * haze, 0.0, 1.0).astype(np.float32)
 
 
@@ -88,6 +105,8 @@ def rain(images: np.ndarray, severity: int, rng: np.random.Generator) -> np.ndar
     n_streaks = (8, 16, 28, 42, 60)[severity - 1]
     length = (3, 4, 5, 6, 7)[severity - 1]
     n, h, w, _ = images.shape
+    # Draw streaks into an empty mask: each starts at a random pixel and is extended
+    # one pixel down (and half a pixel right) per step.
     streaks = np.zeros((n, h, w), dtype=np.float32)
     ys = rng.integers(0, h, size=(n, n_streaks))
     xs = rng.integers(0, w, size=(n, n_streaks))
@@ -96,11 +115,14 @@ def rain(images: np.ndarray, severity: int, rng: np.random.Generator) -> np.ndar
         yy, xx = ys + step, xs + step // 2  # slight slant
         inside = (yy < h) & (xx < w)  # streaks leaving the image are cut off
         streaks[idx[inside], yy[inside], xx[inside]] = 1.0
-    dimmed = 0.8 * images + 0.05
+    dimmed = 0.8 * images + 0.05  # overcast: a bit darker and flatter
+    # Where there is a streak, show the bright streak; elsewhere the dimmed image.
     out = np.maximum(dimmed, 0.85 * streaks[..., None])
     return np.clip(_separable_blur(out, _gaussian_kernel(0.5)), 0.0, 1.0).astype(np.float32)
 
 
+# Lookup table from name (as used in configs/experiment.yaml) to function, so the
+# config can list corruptions as plain strings.
 CORRUPTIONS: dict[str, Callable[[np.ndarray, int, np.random.Generator], np.ndarray]] = {
     "gaussian_noise": gaussian_noise,
     "blur": blur,
@@ -131,10 +153,13 @@ def random_augment(
     from ``names`` at a severity drawn from 1..``max_severity``.
     """
     rng = np.random.default_rng(seed)
-    out = images.copy()
+    out = images.copy()  # never modify the caller's clean training set
+    # Decide up front, per image: corrupt it or not, which corruption, which severity.
     chosen = rng.random(len(images)) < prob
     kinds = rng.integers(0, len(names), size=len(images))
     sevs = rng.integers(1, max_severity + 1, size=len(images))
+    # Then process all images that share a (corruption, severity) together, which
+    # is much faster than one image at a time. Chunks keep memory use bounded.
     for k, name in enumerate(names):
         for sev in range(1, max_severity + 1):
             idx = np.flatnonzero(chosen & (kinds == k) & (sevs == sev))

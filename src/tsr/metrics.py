@@ -15,6 +15,7 @@ from sklearn.metrics import accuracy_score, f1_score
 
 
 def classification_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Accuracy (share correct) and macro-F1 (F1 per class, averaged with equal weight)."""
     return {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
@@ -26,12 +27,15 @@ def latency_ms_per_image(
 ) -> float:
     """Median wall-clock time per image over a few repeats (after one warm-up)."""
     batch = x[:n]
+    # The first call is slower (memory allocation, graph tracing), so it is not timed.
     predict(batch)  # warm-up
     times = []
     for _ in range(repeats):
         start = time.perf_counter()
         predict(batch)
         times.append(time.perf_counter() - start)
+    # Median is robust to one slow repeat (e.g. the OS doing something else).
+    # Seconds per batch -> milliseconds per image.
     return float(np.median(times) / len(batch) * 1000)
 
 

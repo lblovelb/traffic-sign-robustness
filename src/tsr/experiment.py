@@ -27,6 +27,8 @@ import yaml
 from tsr import corruptions, data, metrics
 from tsr.data import NUM_CLASSES
 
+# Columns of results/results.csv: one row per (seed, model, training data,
+# corruption, severity). report.py reads this file.
 FIELDS = [
     "seed",
     "model",
@@ -42,6 +44,7 @@ FIELDS = [
 
 
 def load_config(path: str | Path, quick: bool) -> dict:
+    """Read configs/experiment.yaml. With quick=True, apply the small smoke-test settings."""
     with open(path) as f:
         cfg = yaml.safe_load(f)
     if quick:
@@ -57,11 +60,16 @@ def load_config(path: str | Path, quick: bool) -> dict:
 
 
 def corruption_seed(base: int, name: str, severity: int) -> int:
-    """Stable per-(corruption, severity) seed, identical for every model."""
+    """Stable per-(corruption, severity) seed, identical for every model.
+
+    crc32 turns the name into a fixed number. Python's built-in hash() would not
+    work here, because it changes between runs.
+    """
     return base + zlib.crc32(f"{name}-{severity}".encode()) % 100_000
 
 
 def _row(base: dict, corruption: str, severity: int, seen: bool, m: dict) -> dict:
+    """One CSV row: the run's fixed fields plus this evaluation's results."""
     return {
         **base,
         "corruption": corruption,
@@ -73,6 +81,7 @@ def _row(base: dict, corruption: str, severity: int, seen: bool, m: dict) -> dic
 
 
 def make_model(name: str, cfg: dict, seed: int, input_shape: tuple[int, int, int]):
+    """Create a fresh, untrained model by name ("cnn" or "hog_svm")."""
     from tsr.models import CNNClassifier, HogSvmClassifier
 
     if name == "cnn":
@@ -89,6 +98,7 @@ def make_model(name: str, cfg: dict, seed: int, input_shape: tuple[int, int, int
 
 
 def run(cfg: dict) -> Path:
+    """Train and evaluate every (seed, model, training data) combination."""
     import mlflow
 
     results_dir = Path(cfg["results_dir"])
@@ -98,6 +108,7 @@ def run(cfg: dict) -> Path:
     d = data.load_gtsrb(cfg["data_dir"], cfg["image_size"])
     x_train, y_train = d["x_train"], d["y_train"]
     x_test, y_test = d["x_test"], d["y_test"]
+    # Only set in quick mode: use a smaller, class-balanced subset.
     if "train_samples" in cfg:
         x_train, y_train = data.stratified_subsample(x_train, y_train, cfg["train_samples"], 0)
         x_test, y_test = data.stratified_subsample(x_test, y_test, cfg["test_samples"], 0)
@@ -117,6 +128,7 @@ def run(cfg: dict) -> Path:
         writer.writeheader()
 
         for seed in cfg["seeds"]:
+            # The augmented training set is built once per seed and reused.
             x_aug = None
             for spec in cfg["runs"]:
                 model_name, train_kind = spec["model"], spec["train"]
@@ -154,6 +166,8 @@ def run(cfg: dict) -> Path:
                             }
                         )
 
+                    # Labels are the same for clean and augmented images: corrupting a
+                    # stop sign does not change that it is a stop sign.
                     model = make_model(model_name, cfg, seed, x_fit.shape[1:]).fit(x_fit, y_train)
 
                     # Log Keras training history per epoch so MLflow can plot learning curves.
@@ -172,8 +186,10 @@ def run(cfg: dict) -> Path:
                         "latency_ms": latency,
                         "size_mb": size,
                     }
+                    # Corruptions this model trained on. Empty for clean-trained models.
                     seen = set(aug["corruptions"]) if train_kind == "augmented" else set()
 
+                    # Baseline condition: clean test images (stored as severity 0).
                     m = metrics.classification_metrics(y_test, model.predict(x_test))
                     writer.writerow(_row(base_row, "clean", 0, False, m))
                     mlflow.log_metrics(
@@ -181,6 +197,9 @@ def run(cfg: dict) -> Path:
                     )
                     print(f"clean accuracy {m['accuracy']:.4f}")
 
+                    # Shift / mitigation conditions: every corruption at every severity.
+                    # The test set is corrupted with a fixed seed, so every model is
+                    # evaluated on exactly the same images.
                     corrupted_accs = []
                     for name in ev["corruptions"]:
                         for sev in ev["severities"]:
@@ -188,7 +207,7 @@ def run(cfg: dict) -> Path:
                             x_c = corruptions.apply(x_test, name, sev, c_seed)
                             m = metrics.classification_metrics(y_test, model.predict(x_c))
                             writer.writerow(_row(base_row, name, sev, name in seen, m))
-                            f.flush()
+                            f.flush()  # write to disk now, so a crash keeps earlier rows
                             corrupted_accs.append(m["accuracy"])
                             mlflow.log_metric(f"{name}_s{sev}_accuracy", m["accuracy"])
                             print(f"{name:>15} s{sev}: {m['accuracy']:.4f}")

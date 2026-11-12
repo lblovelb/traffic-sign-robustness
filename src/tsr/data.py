@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+# Official GTSRB download location (the same files torchvision uses).
 BASE_URL = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/"
 FILES = {
     "train": "GTSRB-Training_fixed.zip",
@@ -27,6 +28,7 @@ NUM_CLASSES = 43
 
 
 def _download(raw_dir: Path) -> None:
+    """Download the three zip files (skipping any already present) and unpack them."""
     raw_dir.mkdir(parents=True, exist_ok=True)
     for name in FILES.values():
         target = raw_dir / name
@@ -40,11 +42,17 @@ def _download(raw_dir: Path) -> None:
 
 
 def _load_image(path: Path, size: int) -> np.ndarray:
+    """Read one .ppm image and resize it to size x size. GTSRB images vary in size."""
     with Image.open(path) as img:
         return np.asarray(img.convert("RGB").resize((size, size), Image.BILINEAR), dtype=np.uint8)
 
 
 def _load_train(raw_dir: Path, size: int) -> tuple[np.ndarray, np.ndarray]:
+    """Training images live in one folder per class (00000, 00001, ...).
+
+    The folder name is the label. Images come out sorted by class, which is why
+    experiment.py shuffles them before training.
+    """
     xs, ys = [], []
     for class_dir in sorted(p for p in raw_dir.rglob("Training/*") if p.is_dir()):
         label = int(class_dir.name)
@@ -55,6 +63,7 @@ def _load_train(raw_dir: Path, size: int) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _load_test(raw_dir: Path, size: int) -> tuple[np.ndarray, np.ndarray]:
+    """Test images are in one folder; their labels come from a separate CSV file."""
     gt_file = next(raw_dir.rglob("GT-final_test.csv"))
     image_dir = next(raw_dir.rglob("Final_Test/Images"))
     xs, ys = [], []
@@ -68,6 +77,8 @@ def _load_test(raw_dir: Path, size: int) -> tuple[np.ndarray, np.ndarray]:
 def load_gtsrb(data_dir: str | Path = "data", size: int = 32) -> dict[str, np.ndarray]:
     """Return {"x_train", "y_train", "x_test", "y_test"}; images uint8 (N, size, size, 3)."""
     data_dir = Path(data_dir)
+    # Decoding ~39k images takes minutes, so the result is cached as one compressed
+    # NumPy file. Later runs load it in seconds.
     cache = data_dir / "processed" / f"gtsrb_{size}.npz"
     if cache.exists():
         with np.load(cache) as d:
@@ -84,6 +95,7 @@ def load_gtsrb(data_dir: str | Path = "data", size: int = 32) -> dict[str, np.nd
 
 
 def to_float(images: np.ndarray) -> np.ndarray:
+    """uint8 0-255 -> float32 0-1, the range the corruptions and the CNN expect."""
     return images.astype(np.float32) / 255.0
 
 
@@ -95,6 +107,7 @@ def stratified_subsample(
         return x, y
     rng = np.random.default_rng(seed)
     keep = []
+    # Sample each class separately so rare signs are not lost from the small subset.
     for c in np.unique(y):
         idx = np.flatnonzero(y == c)
         k = max(1, round(n * len(idx) / len(y)))

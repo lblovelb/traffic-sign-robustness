@@ -12,6 +12,7 @@ import pandas as pd
 
 
 def _fmt(mean: float, std: float) -> str:
+    # std is NaN when there is only one seed; then show the mean alone.
     return f"{mean:.3f} ± {std:.3f}" if pd.notna(std) else f"{mean:.3f}"
 
 
@@ -24,11 +25,13 @@ def summarize(df: pd.DataFrame, seen: list[str] | None = None) -> pd.DataFrame:
     if seen is None:
         seen = sorted(df.loc[df["seen_in_training"].astype(bool), "corruption"].unique())
     df = df.copy()
+    # Label every row as clean, seen (used in augmentation) or unseen.
     df["group"] = "unseen"
     df.loc[df["corruption"] == "clean", "group"] = "clean"
     df.loc[df["corruption"].isin(seen), "group"] = "seen"
 
-    # Mean per seed first, then mean/std across seeds.
+    # Mean per seed first, then mean/std across seeds. The std therefore measures
+    # how much results vary between training runs, not between corruption types.
     per_seed = df.groupby(["model", "train", "seed", "group"])["accuracy"].mean().unstack("group")
     per_seed["all_corrupted"] = (
         df[df["group"] != "clean"].groupby(["model", "train", "seed"])["accuracy"].mean()
@@ -61,14 +64,17 @@ def plot(df: pd.DataFrame, path: Path) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    # One subplot per corruption, one line per (model, training data).
     names = [c for c in df["corruption"].unique() if c != "clean"]
     fig, axes = plt.subplots(1, len(names), figsize=(3.2 * len(names), 3.2), sharey=True)
     clean = df[df["corruption"] == "clean"]
     for ax, name in zip(axes, names, strict=True):
+        # Add the clean result as severity 0 so every line starts from the same baseline.
         sub = pd.concat([clean.assign(corruption=name), df[df["corruption"] == name]])
         for (model, train), g in sub.groupby(["model", "train"]):
             s = g.groupby("severity")["accuracy"].agg(["mean", "std"]).fillna(0)
             ax.plot(s.index, s["mean"], marker="o", label=f"{model} ({train})")
+            # Shaded band = ± one standard deviation across seeds.
             ax.fill_between(s.index, s["mean"] - s["std"], s["mean"] + s["std"], alpha=0.15)
         ax.set_title(name)
         ax.set_xlabel("severity (0 = clean)")
@@ -81,6 +87,7 @@ def plot(df: pd.DataFrame, path: Path) -> None:
 
 
 def write_report(csv_path: str | Path) -> Path:
+    """Write summary.md and robustness.png next to the CSV. Called by experiment.py."""
     csv_path = Path(csv_path)
     df = pd.read_csv(csv_path)
     out_dir = csv_path.parent
