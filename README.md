@@ -139,6 +139,7 @@ src/tsr/
   experiment.py    runs all conditions, logs to MLflow + CSV
   report.py        summary table + robustness plot
   preview.py       example images of the corruptions
+notebooks/analysis.ipynb  exploration: class balance, relative drop, seed noise
 configs/experiment.yaml   every experimental setting in one place
 tests/                    unit tests, run in CI on every push
 notes/                    project vault: decisions, experiment log, analysis
@@ -146,10 +147,19 @@ notes/                    project vault: decisions, experiment log, analysis
 
 ## How this project was built: AI-assisted workflow
 
-I built this with Claude Code. Claude generated the initial scaffold (the first
-commit). I then ran the experiments, found and fixed the bugs above, and
-interpreted the results. The repo also contains the configuration I use to work
-with Claude as a team of specialised agents, versioned like code:
+I built this with Claude Code as a pair programmer. The split of work:
+
+- **Claude** generated the initial scaffold (the first commit) and drafted later
+  additions: code comments, the plotting scripts, the analysis notebook and this
+  README.
+- **I** ran every experiment and decided what to change. I spotted both bugs in
+  the learning curves, fixed them in my own commits and checked each fix by
+  re-running. I also reviewed every diff before committing and checked every
+  conclusion in this README against the numbers in `results/`.
+
+The commit history shows this step by step. The repo also contains the
+configuration I use to work with Claude as a team of specialised agents,
+versioned like code:
 
 - `CLAUDE.md`: project rules that every agent follows, for example never
   tuning on the test set and reporting every number as mean ± std over seeds.

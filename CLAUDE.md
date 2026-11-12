@@ -26,7 +26,10 @@ README must be backed by a number in `results/`.
 - `src/tsr/data.py` — GTSRB download + cache (`data/`, git-ignored).
 - `src/tsr/models.py` — `cnn` and `hog_svm`. TensorFlow is imported lazily.
 - `src/tsr/experiment.py` — runs all conditions, logs to MLflow + `results/results.csv`.
-- `src/tsr/report.py` — summary table + plot from the CSV.
+- `src/tsr/report.py` — summary table + robustness plot from the CSV.
+- `src/tsr/curves.py` — learning curves from MLflow (also run by experiment.py).
+- `src/tsr/preview.py` — example images of the corruptions.
+- `notebooks/analysis.ipynb` — exploratory analysis of `results/results.csv`.
 - `configs/experiment.yaml` — **all** experiment settings live here.
 - `notes/` — the project vault (Obsidian-compatible). See `notes/README.md`.
 - `.claude/agents/` — specialised agents. `.claude/skills/` — repeatable procedures.
@@ -38,8 +41,9 @@ pip install -e .                    # makes `import tsr` work
 pytest                              # tests (no TensorFlow needed)
 ruff check . && ruff format --check .
 python -m tsr.experiment --quick    # smoke test, minutes
-python -m tsr.experiment            # full run
-mlflow ui                           # browse runs at http://127.0.0.1:5000
+python -m tsr.experiment            # full run, ~1 hour on a laptop CPU
+python -m tsr.curves                # redraw learning curves without re-training
+mlflow ui --backend-store-uri sqlite:///mlflow.db   # http://127.0.0.1:5000
 ```
 
 ## Rules for experiments (these keep the results trustworthy)
