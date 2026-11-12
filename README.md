@@ -71,6 +71,14 @@ deterministic, so the seed does not change it.
 
 ![Accuracy vs. severity for each corruption](results/robustness.png)
 
+**Learning curves** (mean ± std over 3 seeds). Training and validation accuracy
+track each other and level off near 1.0, so 10 epochs is enough and the model
+is not overfitting. Validation starts higher than training in epoch 1 because
+training accuracy is averaged *during* the epoch (with dropout active), while
+validation is measured at its end.
+
+![CNN learning curves](results/learning_curves.png)
+
 ## Found during development
 
 Two bugs showed up in the learning curves logged to MLflow. Both are fixed,
