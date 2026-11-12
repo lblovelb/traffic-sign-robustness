@@ -16,6 +16,13 @@ metrics, stress-tests its robustness on simulated data, and judges feasibility.
 
 ![Example test images: clean and corrupted](results/examples_corruptions.png)
 
+**Quick tour (2 minutes):**
+- [Key findings](#key-findings): what the experiment shows, in five points
+- [Results](#results): tables, robustness plot and learning curves
+- [Found during development](#found-during-development): two bugs I found in the learning curves and fixed
+- [notebooks/analysis.ipynb](notebooks/analysis.ipynb): extra analysis, such as whether the gains are larger than the seed noise
+- [Commit history](https://github.com/lblovelb/traffic-sign-robustness/commits/main): how the project developed, one change at a time
+
 ## Key findings
 
 1. **The CNN beats the classical baseline.** It reaches 95.1% on clean images
@@ -179,8 +186,8 @@ versioned like code:
 
 ## Background
 
-The design mirrors my bachelor thesis, *Empirical evaluation of English-trained
-machine learning models for phishing email detection in a Scandinavian context*
+The design mirrors my bachelor thesis, [*Empirical evaluation of English-trained
+machine learning models for phishing email detection in a Scandinavian context*](https://lnu.diva-portal.org/smash/record.jsf?pid=diva2%3A2070937)
 (Linnaeus University, 2026). The thesis measured how models degrade under a
 distribution shift (language) and whether a mitigation (machine translation)
 recovers the lost performance. The answer there was similar to findings 2 and 3
