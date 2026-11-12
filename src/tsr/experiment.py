@@ -205,11 +205,17 @@ def main() -> None:
     parser.add_argument("--config", default="configs/experiment.yaml")
     parser.add_argument("--quick", action="store_true", help="small smoke-test run")
     args = parser.parse_args()
-    out_csv = run(load_config(args.config, args.quick))
+    cfg = load_config(args.config, args.quick)
+    out_csv = run(cfg)
 
+    from tsr.curves import fetch_histories, plot_curves
     from tsr.report import write_report
 
     write_report(out_csv)
+    plot_curves(
+        fetch_histories(cfg["mlflow"]["experiment_name"]),
+        Path(cfg["results_dir"]) / "learning_curves.png",
+    )
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from tsr import metrics
+from tsr.curves import plot_curves
 from tsr.experiment import FIELDS, corruption_seed, load_config
 from tsr.report import summarize, write_report
 
@@ -87,3 +88,13 @@ def test_write_report_creates_files(tmp_path):
     out = write_report(csv)
     assert out.exists() and (tmp_path / "robustness.png").exists()
     assert "Results summary" in out.read_text(encoding="utf-8")
+
+
+def test_plot_curves_writes_png(tmp_path):
+    histories = {
+        "clean": {"train": [[0.5, 0.8, 0.9], [0.4, 0.7, 0.9]], "val": [[0.6, 0.8, 0.85]] * 2},
+        "augmented": {"train": [[0.4, 0.7, 0.85]], "val": [[0.5, 0.7, 0.8]]},
+    }
+    out = tmp_path / "learning_curves.png"
+    plot_curves(histories, out)
+    assert out.exists() and out.stat().st_size > 0
