@@ -1,5 +1,11 @@
 # Traffic-sign recognition under bad weather: a robustness evaluation
 
+[![CI](https://github.com/lblovelb/traffic-sign-robustness/actions/workflows/ci.yml/badge.svg)](https://github.com/lblovelb/traffic-sign-robustness/actions/workflows/ci.yml)
+
+*A portfolio project by Love Barrehag, built to show how I approach applied ML
+prototyping: a clear question, a fair baseline, robustness metrics and honest
+conclusions.*
+
 **Question:** a traffic-sign classifier scores ~95% on clean images. What
 happens when the camera sees fog, rain, darkness, blur or sensor noise? And
 does training on degraded images fix it, even for conditions the model never saw?
@@ -36,9 +42,15 @@ metrics, stress-tests its robustness on simulated data, and judges feasibility.
 | **Shift** | clean | corrupted (5 types × 5 severities) | Where and how fast do they break? |
 | **Mitigation** | partly corrupted (noise, darkness, fog) | corrupted | Does augmentation help on *seen* corruptions, and on *unseen* ones (blur, rain)? |
 
-- **Models:** a small CNN (TensorFlow/Keras) and a classical **HOG + linear
-  SVM** baseline. HOG is the kind of hand-crafted pipeline used for traffic
-  signs before deep learning.
+- **Models:**
+  - **CNN** (TensorFlow/Keras): a small convolutional network with about 600k
+    parameters. It learns which visual patterns matter directly from the pixels.
+  - **HOG + linear SVM**: the baseline that stands in for "the existing
+    solution". HOG (Histogram of Oriented Gradients) turns each image into a
+    description of its edge directions, which is stable under small shifts and
+    lighting changes. A linear SVM then separates the 43 classes. This kind of
+    hand-crafted pipeline was the standard approach for sign and pedestrian
+    recognition before deep learning.
 - **Data:** [GTSRB](https://benchmark.ini.rub.de/gtsrb_news.html), 43 classes,
   26,640 training and 12,630 test images, resized to 32×32.
 - **Metrics:** accuracy, macro-F1, latency per image and model size.
@@ -110,6 +122,11 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db   # browse runs at http://127.
 ```
 
 The dataset (~300 MB) downloads automatically into `data/` on the first run.
+
+**Continuous integration:** on every push, GitHub Actions runs `ruff`
+(lint and formatting) and the `pytest` suite (see `.github/workflows/ci.yml`).
+The tests cover the corruptions, metrics and reporting. They run without
+TensorFlow, which keeps CI fast.
 
 ## Project layout
 
